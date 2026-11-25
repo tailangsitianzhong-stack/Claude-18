@@ -17,7 +17,7 @@
   <h1>BG Player</h1>
 
   <form id="addForm">
-    <input id="urlInput" type="url" inputmode="url" placeholder="YouTube または 動画/音声ファイルのURLを貼り付け" autocomplete="off" required>
+    <input id="urlInput" type="url" inputmode="url" placeholder="YouTube / ニコニコ / 動画・音声ファイルのURLを貼り付け" autocomplete="off" required>
     <button type="submit">再生</button>
   </form>
   <div class="row">
@@ -27,6 +27,7 @@
 
   <section id="stage">
     <div id="ytWrap" hidden><div id="ytPlayer"></div></div>
+    <div id="nicoWrap" hidden><iframe id="nicoFrame" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
     <video id="media" playsinline controls hidden></video>
     <div id="empty">URLを貼り付けて再生してください</div>
   </section>
@@ -55,7 +56,7 @@
     <ul class="tips">
       <li><b>ホーム画面に追加</b>してアプリとして開くと止まりにくくなります。(iPhone: 共有→ホーム画面に追加 / Android: メニュー→アプリをインストール)</li>
       <li><b>ファイルのURL(mp3/mp4/m3u8)</b>は画面を消しても再生を続けます。</li>
-      <li><b>YouTube</b>は公式埋め込みのため、端末やブラウザによっては画面オフで止まります。止まった時はロック画面の再生ボタンか、画面を戻して再開してください。</li>
+      <li><b>YouTube・ニコニコ</b>は公式埋め込みのため、端末やブラウザによっては画面オフで止まります。止まった時はロック画面の再生ボタンか、画面を戻して再開してください。</li>
       <li>「画面点灯」をオンにすると画面が消えず再生が続きます(電池を消費します)。</li>
     </ul>
   </details>

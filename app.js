@@ -1,7 +1,7 @@
 'use strict';
 // ---------- 状態 ----------
 const $ = id => document.getElementById(id);
-const media = $('media'), ytWrap = $('ytWrap'), stage = $('stage'), empty = $('empty');
+const media = $('media'), ytWrap = $('ytWrap'), nicoWrap = $('nicoWrap'), nicoFrame = $('nicoFrame'), stage = $('stage'), empty = $('empty');
 const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -35,10 +35,23 @@ function parseYouTube(u) {
     return id && /^[\w-]{11}$/.test(id) ? id : null;
   } catch { return null; }
 }
+function parseNico(u) {
+  try {
+    const url = new URL(u);
+    const h = url.hostname.replace(/^www\.|^sp\./, '');
+    let m = null;
+    if (h === 'nicovideo.jp') m = url.pathname.match(/^\/watch\/((?:sm|nm|so)?\d+)/);
+    else if (h === 'nico.ms') m = url.pathname.match(/^\/((?:sm|nm|so)?\d+)/);
+    else if (h === 'embed.nicovideo.jp') m = url.pathname.match(/^\/watch\/((?:sm|nm|so)?\d+)/);
+    return m ? m[1] : null;
+  } catch { return null; }
+}
 function makeItem(u) {
   u = u.trim();
   const id = parseYouTube(u);
   if (id) return { id: uid(), kind: 'yt', src: id, title: 'YouTube ' + id };
+  const nid = parseNico(u);
+  if (nid) return { id: uid(), kind: 'nico', src: nid, title: 'ニコニコ ' + nid };
   try {
     const url = new URL(u);
     const name = decodeURIComponent(url.pathname.split('/').pop()) || url.hostname;
@@ -90,18 +103,43 @@ function onYtState(e) {
   } else if (e.data === S.ENDED) onEnded();
 }
 
+// ---------- ニコニコ(埋め込みプレイヤー postMessage API) ----------
+let nicoPlaying = false, nicoTime = 0;
+function nicoCmd(eventName, data) {
+  try { nicoFrame.contentWindow.postMessage({ sourceConnectorType: 1, playerId: '1', eventName, ...(data ? { data } : {}) }, 'https://embed.nicovideo.jp'); } catch {}
+}
+window.addEventListener('message', e => {
+  if (e.origin !== 'https://embed.nicovideo.jp' || !e.data || e.data.playerId !== '1' || list[cur]?.kind !== 'nico') return;
+  const { eventName, data } = e.data;
+  if (eventName === 'playerMetadataChange' && data) {
+    nicoTime = data.currentTime || 0;
+  } else if (eventName === 'playerStatusChange' && data) {
+    // 2:再生中 3:一時停止 4:再生完了
+    if (data.playerStatus === 2) { nicoPlaying = true; wantPlaying = true; setPlayIcon(true); setPS('playing'); silentOn(); }
+    else if (data.playerStatus === 3) { nicoPlaying = false; setPlayIcon(false); setPS('paused'); }
+    else if (data.playerStatus === 4) { nicoPlaying = false; onEnded(); }
+  } else if (eventName === 'error') {
+    setTitle('ニコニコ動画を再生できません(埋め込み不可・要ログイン等)'); setTimeout(next, 2000);
+  }
+});
+
 // ---------- 再生制御 ----------
 function stopAll() {
   media.pause(); media.removeAttribute('src'); media.load();
   if (hls) { hls.destroy(); hls = null; }
   try { ytReady && yt.stopVideo(); } catch {}
+  nicoFrame.removeAttribute('src'); nicoWrap.hidden = true;
 }
 function play(i) {
   if (i < 0 || i >= list.length) return;
   cur = i; store.set('cur', cur);
   const it = list[i];
   stopAll(); render(); setTitle(it.title); empty.hidden = true; wantPlaying = true;
-  if (it.kind === 'yt') {
+  if (it.kind === 'nico') {
+    media.hidden = true; ytWrap.hidden = true; nicoWrap.hidden = false; stage.classList.remove('audio');
+    nicoFrame.src = `https://embed.nicovideo.jp/watch/${it.src}?jsapi=1&playerId=1&autoplay=1`;
+    silentOn();
+  } else if (it.kind === 'yt') {
     media.hidden = true; ytWrap.hidden = false; stage.classList.remove('audio');
     loadYTApi();
     if (ytReady) yt.loadVideoById(it.src); else ytPending = it.src;
@@ -132,6 +170,10 @@ function loadHls() {
 function toggle() {
   if (cur < 0) { if (list.length) play(0); return; }
   const it = list[cur];
+  if (it.kind === 'nico') {
+    if (nicoPlaying) pauseAny(); else playAny();
+    return;
+  }
   if (it.kind === 'yt') {
     if (!ytReady) return;
     const st = yt.getPlayerState();
@@ -141,8 +183,8 @@ function toggle() {
     if (media.paused) media.play(); else media.pause();
   }
 }
-function pauseAny() { wantPlaying = false; if (list[cur]?.kind === 'yt') { try { yt.pauseVideo(); } catch {} } else media.pause(); }
-function playAny() { wantPlaying = true; if (list[cur]?.kind === 'yt') { try { yt.playVideo(); } catch {} } else media.play().catch(() => {}); }
+function pauseAny() { wantPlaying = false; if (list[cur]?.kind === 'nico') nicoCmd('pause'); else if (list[cur]?.kind === 'yt') { try { yt.pauseVideo(); } catch {} } else media.pause(); }
+function playAny() { wantPlaying = true; if (list[cur]?.kind === 'nico') nicoCmd('play'); else if (list[cur]?.kind === 'yt') { try { yt.playVideo(); } catch {} } else media.play().catch(() => {}); }
 function pickNext(dir) {
   if (!list.length) return -1;
   if (shuffle && list.length > 1) { let r; do r = Math.floor(Math.random() * list.length); while (r === cur); return r; }
@@ -154,12 +196,12 @@ function next() {
   if (n >= 0) play(n); else { wantPlaying = false; setPlayIcon(false); }
 }
 function prev() {
-  const t = list[cur]?.kind === 'yt' ? (ytReady ? yt.getCurrentTime() : 0) : media.currentTime;
+  const t = curTime();
   if (t > 5) return seekTo(0);
   let n = pickNext(-1); if (n < 0) n = repeat === 1 ? list.length - 1 : 0;
   play(n);
 }
-function seekTo(t) { if (list[cur]?.kind === 'yt') yt.seekTo(t, true); else media.currentTime = t; }
+function seekTo(t) { if (list[cur]?.kind === 'nico') nicoCmd('seek', { time: t }); else if (list[cur]?.kind === 'yt') yt.seekTo(t, true); else media.currentTime = t; }
 function onEnded() {
   if (repeat === 2) return play(cur);
   next();
@@ -181,7 +223,7 @@ function render() {
     const t = document.createElement('div'); t.className = 't';
     t.textContent = it.title; t.onclick = () => play(i);
     const k = document.createElement('span'); k.className = 'k';
-    k.textContent = it.kind === 'yt' ? 'YT' : it.kind === 'local' ? '端末' : 'URL';
+    k.textContent = it.kind === 'yt' ? 'YT' : it.kind === 'nico' ? 'ニコ' : it.kind === 'local' ? '端末' : 'URL';
     const d = document.createElement('button'); d.textContent = '✕'; d.setAttribute('aria-label', '削除');
     d.onclick = () => { list.splice(i, 1); if (i < cur) cur--; else if (i === cur) { cur = -1; stopAll(); wantPlaying = false; setPlayIcon(false); } save(); render(); };
     li.append(k, t, d); ul.append(li);
@@ -222,7 +264,7 @@ $('clearBtn').onclick = () => { if (confirm('再生リストを空にします�
 $('pipBtn').onclick = async () => {
   try {
     if (document.pictureInPictureElement) await document.exitPictureInPicture();
-    else if (list[cur]?.kind !== 'yt' && document.pictureInPictureEnabled) await media.requestPictureInPicture();
+    else if (list[cur]?.kind !== 'yt' && list[cur]?.kind !== 'nico' && document.pictureInPictureEnabled) await media.requestPictureInPicture();
     else alert('小窓はファイル/URL再生で利用できます。YouTubeはYouTube側の操作に従ってください。');
   } catch (e) { alert('小窓にできませんでした: ' + e.message); }
 };
@@ -255,7 +297,7 @@ function updateSession() {
 }
 function updatePosition() {
   if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
-  if (list[cur]?.kind === 'yt' || !isFinite(media.duration)) return;
+  if (list[cur]?.kind === 'yt' || list[cur]?.kind === 'nico' || !isFinite(media.duration)) return;
   try { navigator.mediaSession.setPositionState({ duration: media.duration, position: media.currentTime, playbackRate: media.playbackRate }); } catch {}
 }
 if ('mediaSession' in navigator) {
@@ -266,7 +308,7 @@ if ('mediaSession' in navigator) {
   h('seekforward', () => seekTo(curTime() + 10));
   h('seekto', d => seekTo(d.seekTime));
 }
-function curTime() { return list[cur]?.kind === 'yt' && ytReady ? yt.getCurrentTime() : media.currentTime; }
+function curTime() { if (list[cur]?.kind === 'nico') return nicoTime; return list[cur]?.kind === 'yt' && ytReady ? yt.getCurrentTime() : media.currentTime; }
 function throttle(f, ms) { let t = 0; return (...a) => { const n = Date.now(); if (n - t > ms) { t = n; f(...a); } }; }
 
 // ---------- 起動 ----------
