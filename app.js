@@ -119,7 +119,8 @@ window.addEventListener('message', e => {
     else if (data.playerStatus === 3) { nicoPlaying = false; setPlayIcon(false); setPS('paused'); }
     else if (data.playerStatus === 4) { nicoPlaying = false; onEnded(); }
   } else if (eventName === 'error') {
-    setTitle('ニコニコ動画を再生できません(埋め込み不可・要ログイン等)'); setTimeout(next, 2000);
+    // 致命的とは限らないので自動スキップはせず、内容を表示する(プレイヤー内の再生ボタンも押せる)
+    setTitle('ニコニコ: エラー通知 ' + JSON.stringify(data || {}).slice(0, 120));
   }
 });
 

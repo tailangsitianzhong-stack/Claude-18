@@ -23,3 +23,4 @@ ul#list{list-style:none;margin:0;padding:0}
 #list .k{font-size:11px;color:var(--mut)}
 #list button{padding:4px 10px;background:transparent;color:var(--mut);border:1px solid #2c303a}
 details{margin-top:24px;color:var(--mut)}.tips{padding-left:20px}
+[hidden]{display:none!important}
