@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BG Player</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>BG Player</h1>
+
+  <form id="addForm">
+    <input id="urlInput" type="url" inputmode="url" placeholder="YouTube または 動画/音声ファイルのURLを貼り付け" autocomplete="off" required>
+    <button type="submit">再生</button>
+  </form>
+  <div class="row">
+    <label class="filebtn">端末のファイルを選ぶ<input id="fileInput" type="file" accept="audio/*,video/*" multiple hidden></label>
+    <button id="queueBtn" type="button" class="ghost">リストに追加のみ</button>
+  </div>
+
+  <section id="stage">
+    <div id="ytWrap" hidden><div id="ytPlayer"></div></div>
+    <video id="media" playsinline controls hidden></video>
+    <div id="empty">URLを貼り付けて再生してください</div>
+  </section>
+
+  <div id="nowTitle" aria-live="polite"></div>
+
+  <div class="controls">
+    <button id="prevBtn" aria-label="前">⏮</button>
+    <button id="playBtn" aria-label="再生/停止">▶</button>
+    <button id="nextBtn" aria-label="次">⏭</button>
+    <button id="repeatBtn" class="ghost" aria-label="リピート">🔁 オフ</button>
+    <button id="shuffleBtn" class="ghost" aria-label="シャッフル">🔀 オフ</button>
+  </div>
+  <div class="controls">
+    <button id="pipBtn" class="ghost">小窓(PiP)</button>
+    <button id="wakeBtn" class="ghost">画面点灯 オフ</button>
+    <button id="audioOnlyBtn" class="ghost">音声のみ(ファイル) オフ</button>
+  </div>
+
+  <h2>再生リスト</h2>
+  <ul id="list"></ul>
+  <button id="clearBtn" class="ghost danger">リストを空にする</button>
+
+  <details>
+    <summary>バックグラウンド再生のコツ</summary>
+    <ul class="tips">
+      <li><b>ホーム画面に追加</b>してアプリとして開くと止まりにくくなります。(iPhone: 共有→ホーム画面に追加 / Android: メニュー→アプリをインストール)</li>
+      <li><b>ファイルのURL(mp3/mp4/m3u8)</b>は画面を消しても再生を続けます。</li>
+      <li><b>YouTube</b>は公式埋め込みのため、端末やブラウザによっては画面オフで止まります。止まった時はロック画面の再生ボタンか、画面を戻して再開してください。</li>
+      <li>「画面点灯」をオンにすると画面が消えず再生が続きます(電池を消費します)。</li>
+    </ul>
+  </details>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
